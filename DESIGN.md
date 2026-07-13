@@ -33,12 +33,12 @@ low-risk path possible:
 
 - **Issuing/renewing/storing** a cert is cleanly a **device** — it is just
   HTTP + crypto + store writes. **Zero base changes.** This is M1, and it is done.
-- **Applying** a cert to the running `cowboy` listener cannot be done from a
-  device (a device does not own listener startup). It needs a **small, generic**
-  hook in `hb_http_server`: "if a cert is configured/in the store, `start_tls`
-  with it, else `start_clear` as today." That is a base *capability*, not a
-  custom device in base — and it is the only base change the whole effort needs.
-  This is M2.
+- **Applying** a cert to serve public TLS. A device does not own the node's
+  primary listener startup, but it *can* open a **second** listener of its own.
+  So M2 has the device start its own `cowboy:start_tls` on 443 and reverse-proxy
+  to the existing cleartext port — no base change at all. (A cleaner-but-core
+  alternative, a generic `start_tls` hook in `hb_http_server`, was considered and
+  deliberately not taken; see "M2 — termination" below.)
 
 ## Why "acme@1.0"
 
@@ -104,12 +104,54 @@ like any other AO-Core device. A future protocol-breaking revision would be
   is. Nothing about the credentials is embedded in the base image — they arrive
   via config, the generic LapEE/AndEE pattern.
 
+## M2 — termination (device-only)
+
+M2 makes the node terminate its own TLS. Two shapes were possible:
+
+- **Core edit.** Add an `https` branch to `hb_http_server`'s protocol `case` that
+  calls `cowboy:start_tls` with the cert from config/store. One listener, no
+  extra hop, and a clean upstream PR — but it edits the base repo.
+- **Device-only (chosen).** The `acme@1.0` device opens **its own**
+  `cowboy:start_tls` listener and reverse-proxies to the node's existing
+  cleartext port. The base repo is untouched; everything ships as the published
+  device ID + config.
+
+The device-only path was chosen to keep base pristine (the same rule that keeps
+custom devices out of base). It is "Caddy internalised as a device": the TLS key
+lives in the appliance's store and never leaves it, but no `hb_http_server`
+change is needed.
+
+Mechanics:
+
+- `acme_store:tls_opts/2` turns the stored leaf+chain+key into `ssl` listener
+  options (`cert`/`key`/`cacerts`). **Proven** by `test/tls_check.escript`: a
+  client verifies the live terminator against the issuing CA, with hostname
+  checking, for both the apex and a wildcard name — so the chain it serves is
+  complete and trusted.
+- `acme_tls` starts the `cowboy:start_tls` listener with those options and a
+  route that sends everything to `acme_tls_proxy`.
+- `acme_tls_proxy` relays each request to `127.0.0.1:<clear-port>` over `gun`,
+  **preserving the Host header** (so a tunnel provider still routes public
+  traffic to the right registered node) and passing status/redirects/content
+  types/bodies of any size through untouched. Hop-by-hop headers are stripped.
+- `dev_acme` is the on/start hook: load the cert from the store, issue via
+  `acme_client` if it is missing or within `renew-days` of expiry, then start the
+  terminator. The ACME account key is persisted and reused across renewals.
+
+The one runtime cost versus the core edit is a second listener and an in-process
+loopback hop — negligible on localhost, and the same idiom the tunnel device
+already uses.
+
 ## What is deliberately not here yet
 
-- **Termination (M2).** The generic `hb_http_server` `start_tls` hook + hot
-  reload on renewal. Requires the one small base change described above.
-- **Renewal (M3).** A ~60-day timer that re-runs `issue/1` and swaps the live
-  cert, plus packaging as the loadable `acme@1.0` device (published Arweave ID
-  referenced from optional config, never source in base).
+- **In-node M2 integration test.** `acme_tls`/`acme_tls_proxy`/`dev_acme` compile
+  and target the cowboy/gun already on a HyperBEAM node; the end-to-end
+  terminate-and-relay test (large bodies, redirects, Host routing) runs on a
+  HyperBEAM harness, not the offline suite.
+- **Renewal loop + A record (M3).** A ~60-day timer that re-runs `issue/1` and
+  swaps the live cert, and publishing the node's own wildcard **A record** via
+  the same DNS API (M1/M2 only write the `_acme-challenge` TXT). Then packaging
+  as the loadable `acme@1.0` device (published Arweave ID referenced from optional
+  config, never source in base).
 - **More DNS providers.** The behaviour is provider-agnostic; Namecheap is the
   reference. Route53/Cloudflare/etc. are additive.

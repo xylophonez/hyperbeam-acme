@@ -58,21 +58,36 @@ hand-rolled CSR passes `openssl`'s own PKCS#10 self-signature + SAN checks.
 | Milestone | Scope | Base change |
 | --- | --- | --- |
 | **M1 — issuance** ✅ | DNS-01 order → wildcard cert in the store | none (pure device) |
-| **M2 — termination** | minimal generic `start_tls` hook reading the cert from the store; retire Caddy | one small, generic listener hook |
-| **M3 — renewal + device** | ~60-day renewal loop; packaged `acme@1.0` device | none beyond M2 |
+| **M2 — termination** 🚧 | in-node TLS terminator proxying the local clear port; retire Caddy | **none** (device-only) |
+| **M3 — renewal + device** | ~60-day renewal loop; A-record publish; packaged `acme@1.0` device | none |
 
-M1 deliberately requires **zero** base changes — issuing/storing certs is cleanly
-a device. Only *applying* a cert to the running listener needs a small,
-**generic** hook in `hb_http_server` (not a custom device in base); that is M2.
+**M2 keeps base pristine too.** The clean alternative — a generic `start_tls`
+hook in `hb_http_server` — would be one small, upstreamable core edit, but it was
+deliberately *not* taken. Instead the device opens **its own** `cowboy:start_tls`
+listener and reverse-proxies to the node's cleartext port, so the whole thing
+still ships as a published device ID + config with **zero** changes to the base
+repo. See [DESIGN.md](DESIGN.md#m2-termination-device-only).
+
+**M2 status:** the load-bearing part — turning stored cert material into a live,
+chain-complete, *trusted* TLS listener — is proven offline
+(`test/tls_check.escript`: a client verifies the terminator against its CA with
+hostname checking, for both the apex and a wildcard host). The cowboy terminator
+(`acme_tls`), the faithful gun reverse-proxy (`acme_tls_proxy`), and the device
+hook (`dev_acme`) are written and compile-clean; their in-node integration test
+runs on a HyperBEAM harness.
 
 ## Architecture
 
-| Module | Responsibility |
-| --- | --- |
-| `acme_jose` | ES256/JWS, JWK thumbprint, dns-01 keyAuthorization (RFC 7515/7518/7638) |
-| `acme_csr` | PKCS#10 CSR with a SubjectAltName over the wildcard + apex, via a tiny DER encoder |
-| `acme_client` | the RFC 8555 DNS-01 state machine, with a pluggable DNS callback |
-| `acme_dns_namecheap` | Namecheap DNS provider — read-modify-write, never clobbers existing records |
+| Module | Responsibility | Runs |
+| --- | --- | --- |
+| `acme_jose` | ES256/JWS, JWK thumbprint, dns-01 keyAuthorization (RFC 7515/7518/7638) | anywhere |
+| `acme_csr` | PKCS#10 CSR with a SubjectAltName over the wildcard + apex, via a tiny DER encoder | anywhere |
+| `acme_client` | the RFC 8555 DNS-01 state machine, with a pluggable DNS callback | anywhere |
+| `acme_dns_namecheap` | Namecheap DNS provider — read-modify-write, never clobbers existing records | anywhere |
+| `acme_store` | stored PEM chain+key → TLS listener options; leaf expiry / renewal check | anywhere |
+| `acme_tls` | opens the in-node `cowboy:start_tls` terminator (M2) | in HyperBEAM |
+| `acme_tls_proxy` | cowboy handler: faithfully relay each request to the local clear port | in HyperBEAM |
+| `dev_acme` | the `acme@1.0` device on/start hook: ensure cert, start terminator | in HyperBEAM |
 
 ## DNS providers
 
