@@ -58,7 +58,7 @@ hand-rolled CSR passes `openssl`'s own PKCS#10 self-signature + SAN checks.
 | Milestone | Scope | Base change |
 | --- | --- | --- |
 | **M1 — issuance** ✅ | DNS-01 order → wildcard cert in the store | none (pure device) |
-| **M2 — termination** 🚧 | in-node TLS terminator proxying the local clear port; retire Caddy | **none** (device-only) |
+| **M2 — termination** ✅ | in-node TLS terminator proxying the local clear port; retire Caddy | **none** (device-only) |
 | **M3 — renewal + device** | ~60-day renewal loop; A-record publish; packaged `acme@1.0` device | none |
 
 **M2 keeps base pristine too.** The clean alternative — a generic `start_tls`
@@ -68,13 +68,14 @@ listener and reverse-proxies to the node's cleartext port, so the whole thing
 still ships as a published device ID + config with **zero** changes to the base
 repo. See [DESIGN.md](DESIGN.md#m2-termination-device-only).
 
-**M2 status:** the load-bearing part — turning stored cert material into a live,
-chain-complete, *trusted* TLS listener — is proven offline
-(`test/tls_check.escript`: a client verifies the terminator against its CA with
-hostname checking, for both the apex and a wildcard host). The cowboy terminator
-(`acme_tls`), the faithful gun reverse-proxy (`acme_tls_proxy`), and the device
-hook (`dev_acme`) are written and compile-clean; their in-node integration test
-runs on a HyperBEAM harness.
+**M2 status:** proven two ways. Offline, `test/tls_check.escript` verifies the
+terminator against its CA with hostname checking (apex + wildcard,
+chain-complete). In-node, `test/m2_proxy_check.escript` stands the terminator up
+in front of a **real running HyperBEAM listener** and confirms every response
+relays **byte-for-byte through TLS** — a 200 JSON body, a **307 with its
+`Location` preserved**, a hyperbuddy page, and a 404 passthrough all matched the
+cleartext origin exactly. What remains is wiring `dev_acme`'s issue→store→terminate
+path end-to-end, which folds into packaging the loadable device (M3).
 
 ## Architecture
 
