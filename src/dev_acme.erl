@@ -24,11 +24,22 @@
 -define(RENEW_DAYS, 30).
 -define(TLS_REF, acme_tls_listener).
 
-%% AO-Core device hook: (Msg1, Msg2, Opts) -> {ok, Msg1}. Side effect is the
-%% running terminator; the message passes through unchanged.
+%% AO-Core device hook: (Msg1, Msg2, Opts) -> {ok, Msg1}. Side effects are the
+%% running terminator and renewer; the message passes through unchanged.
 start(M1, _M2, Opts) ->
     Config = config(M1, Opts),
+    ok = publish_a_records(Config),
     {Chain, Key} = ensure_cert(Config),
+    ok = start_terminator(Config, Chain, Key),
+    {ok, _} = acme_renewer:start_link(#{
+        chain_path => chain_path(Config),
+        renew_days => maps:get(renew_days, Config, ?RENEW_DAYS),
+        interval_ms => maps:get(renew_interval_ms, Config, 12 * 60 * 60 * 1000),
+        renew_fun => fun() -> renew(Config) end}),
+    {ok, M1}.
+
+start_terminator(Config, Chain, Key) ->
+    _ = acme_tls:stop(?TLS_REF),
     {ok, _} = acme_tls:start(#{
         ref => ?TLS_REF,
         tls_port => maps:get(tls_port, Config, 443),
@@ -36,7 +47,45 @@ start(M1, _M2, Opts) ->
         key_pem => Key,
         clear_host => "127.0.0.1",
         clear_port => maps:get(clear_port, Config)}),
-    {ok, M1}.
+    ok.
+
+%% Re-issue and hot-swap the live cert (called by the renewer).
+renew(Config) ->
+    Dir = maps:get(cert_dir, Config),
+    {Chain, Key} = issue_and_store(Config, Dir, chain_path(Config), key_path(Config)),
+    start_terminator(Config, Chain, Key).
+
+%% Publish the node's own A records so DNS points the wildcard + apex at it.
+%% Optional: only runs when a public IP is known and the provider supports it.
+publish_a_records(Config) ->
+    case public_ip(Config) of
+        undefined -> ok;
+        Ip ->
+            {Mod, State} = dns_provider(Config),
+            case erlang:function_exported(Mod, ensure_a, 3) of
+                true ->
+                    lists:foldl(
+                      fun(Id, S) ->
+                              {ok, S1} = Mod:ensure_a(S, a_name(Id, Config), Ip),
+                              S1
+                      end, State, maps:get(identifiers, Config)),
+                    ok;
+                false -> ok
+            end
+    end.
+
+%% A record host for an identifier: the name itself (wildcard included), under
+%% the managed domain.
+a_name(Id, _Config) -> Id.
+
+public_ip(Config) ->
+    case maps:get(public_ip, Config, undefined) of
+        undefined -> maps:get(client_ip, maps:get(dns, Config, #{}), undefined);
+        Ip -> Ip
+    end.
+
+chain_path(Config) -> filename:join(maps:get(cert_dir, Config), "cert-chain.pem").
+key_path(Config) -> filename:join(maps:get(cert_dir, Config), "cert-key.pem").
 
 %%% ---- certificate lifecycle ----------------------------------------------
 

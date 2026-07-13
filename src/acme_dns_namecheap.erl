@@ -8,7 +8,7 @@
 -module(acme_dns_namecheap).
 -behaviour(acme_client).
 
--export([new/1, set_txt/3, clear_txt/3, clear_name/2]).
+-export([new/1, set_txt/3, clear_txt/3, clear_name/2, ensure_a/3]).
 
 %% State: the API credentials plus the SLD/TLD split of the managed domain.
 %% #{api_user, api_key, username, client_ip, sld, tld}
@@ -36,6 +36,18 @@ clear_txt(State, FqdnName, Value) ->
     Host = host_label(FqdnName, State),
     modify(State, fun(Hosts) ->
         [H || H <- Hosts, not same_txt(H, Host, Value)]
+    end).
+
+%% Point a name's A record at Ip (read-modify-write; replaces any existing A at
+%% that name). Lets a self-hosting node publish its own wildcard + apex records
+%% so DNS points at itself — the last piece of DNS self-bootstrap alongside the
+%% dns-01 TXT. Idempotent.
+ensure_a(State, FqdnName, Ip) ->
+    Host = host_label(FqdnName, State),
+    modify(State, fun(Hosts) ->
+        Kept = [H || H <- Hosts,
+                     not (maps:get(name, H) =:= Host andalso maps:get(type, H) =:= <<"A">>)],
+        Kept ++ [#{name => Host, type => <<"A">>, address => Ip, ttl => <<"300">>}]
     end).
 
 %% Remove every TXT record at a name in one write (idempotent teardown).

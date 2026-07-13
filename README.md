@@ -59,7 +59,7 @@ hand-rolled CSR passes `openssl`'s own PKCS#10 self-signature + SAN checks.
 | --- | --- | --- |
 | **M1 — issuance** ✅ | DNS-01 order → wildcard cert in the store | none (pure device) |
 | **M2 — termination** ✅ | in-node TLS terminator proxying the local clear port; retire Caddy | **none** (device-only) |
-| **M3 — renewal + device** | ~60-day renewal loop; A-record publish; packaged `acme@1.0` device | none |
+| **M3 — renewal + device** 🚧 | ~60-day renewal loop; A-record publish; packaged `acme@1.0` device | none |
 
 **M2 keeps base pristine too.** The clean alternative — a generic `start_tls`
 hook in `hb_http_server` — would be one small, upstreamable core edit, but it was
@@ -88,7 +88,8 @@ path end-to-end, which folds into packaging the loadable device (M3).
 | `acme_store` | stored PEM chain+key → TLS listener options; leaf expiry / renewal check | anywhere |
 | `acme_tls` | opens the in-node `cowboy:start_tls` terminator (M2) | in HyperBEAM |
 | `acme_tls_proxy` | cowboy handler: faithfully relay each request to the local clear port | in HyperBEAM |
-| `dev_acme` | the `acme@1.0` device on/start hook: ensure cert, start terminator | in HyperBEAM |
+| `acme_renewer` | periodic gen_server: re-issue + hot-swap the cert near expiry | anywhere |
+| `dev_acme` | the `acme@1.0` on/start hook: publish A records, ensure cert, terminate, renew | in HyperBEAM |
 
 ## DNS providers
 
