@@ -1,0 +1,6 @@
+/ebin/
+*.beam
+*.pem
+*.der
+erl_crash.dump
+/_build/
