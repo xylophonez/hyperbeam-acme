@@ -1,19 +1,25 @@
 {
-  "_note": "MERGE these keys into your LapEE/node config (e.g. the tunnel provider's broker config); do not use standalone. The acme@1.0 pin is the published Arweave impl dataitem ID (spec: WmlAr6MSo6Iq6gViQ9A5qXnC-RTRSBHx4fOzE7cpGdI). Set your own domain, identifiers, clear-port, cert-dir, and DNS credentials. NEVER commit the real api-key.",
+  "_note": "MERGE into your LapEE/node config. acme@1.0 pin is the published Arweave impl dataitem ID. The on/start hook MUST use path 'run' (not 'start' - collides with hb dispatch) and hook.result 'ignore' (or the handler return breaks the on/start chain). Requires a node with a REAL public IP / reachable inbound port - will NOT work behind CGNAT (Starlink, most mobile). Set your domain/identifiers/ports and DNS creds; never commit the api-key.",
   "on": {
     "start": [
       {
         "device": "acme@1.0",
-        "path": "start"
+        "path": "run",
+        "hook": {
+          "result": "ignore"
+        }
       }
     ]
   },
   "trusted-devices": {
-    "acme@1.0": "YQ3cHTTYWYqbXs92c92_YxPy48eFx1v9UqX7ileVHVI"
+    "acme@1.0": "72XYKqaXO5JVj6_LMpkNVjWrv1wGQH3ZW9_2eNyQVsk"
   },
   "acme": {
     "domain": "example.com",
-    "identifiers": ["*.tunnel.example.com", "tunnel.example.com"],
+    "identifiers": [
+      "*.tunnel.example.com",
+      "tunnel.example.com"
+    ],
     "tls-port": 443,
     "clear-port": 8080,
     "cert-dir": "/var/lib/hyperbeam/acme",
