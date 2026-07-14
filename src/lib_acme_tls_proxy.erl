@@ -13,6 +13,11 @@
                      <<"proxy-authorization">>, <<"te">>, <<"trailer">>,
                      <<"transfer-encoding">>, <<"upgrade">>, <<"content-length">>]).
 
+%% Must exceed the tunnel's own hold windows: it holds registration long-polls
+%% up to 45s and tunnelled responses up to 300s (dev_tunnel DEFAULT_*_TIMEOUT).
+%% A shorter proxy timeout would sever slow tunnelled responses.
+-define(UPSTREAM_TIMEOUT, 330000).
+
 init(Req0, State = #{clear_host := CHost, clear_port := CPort}) ->
     Method = cowboy_req:method(Req0),
     Path = full_path(Req0),
@@ -50,13 +55,13 @@ proxy(Host, Port, Method, Path, Headers, Body) ->
                                                      retry => 0}) of
         {ok, Conn} ->
             try
-                {ok, http} = gun:await_up(Conn, 5000),
+                {ok, http} = gun:await_up(Conn, 15000),
                 Ref = gun:request(Conn, Method, Path, HdrList, Body),
-                case gun:await(Conn, Ref, 60000) of
+                case gun:await(Conn, Ref, ?UPSTREAM_TIMEOUT) of
                     {response, fin, Status, RHdrs} ->
                         {ok, Status, RHdrs, <<>>};
                     {response, nofin, Status, RHdrs} ->
-                        {ok, RBody} = gun:await_body(Conn, Ref, 60000),
+                        {ok, RBody} = gun:await_body(Conn, Ref, ?UPSTREAM_TIMEOUT),
                         {ok, Status, RHdrs, RBody};
                     {error, R} -> {error, R}
                 end
