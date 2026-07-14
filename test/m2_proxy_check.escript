@@ -1,5 +1,5 @@
 #!/usr/bin/env escript
-%%% M2 in-node proof: stand up the acme_tls terminator (cowboy:start_tls) in
+%%% M2 in-node proof: stand up the lib_acme_tls terminator (cowboy:start_tls) in
 %%% front of a REAL running HyperBEAM cleartext listener, and prove every
 %%% response relays byte-for-byte (status + Location + body) through TLS.
 %%%
@@ -14,7 +14,7 @@ main([CertF, KeyF, ClearPortS, TlsPortS]) ->
     {ok, Chain} = file:read_file(CertF),
     {ok, Key} = file:read_file(KeyF),
 
-    {ok, _} = acme_tls:start(#{ref => m2test, tls_port => TlsPort,
+    {ok, _} = lib_acme_tls:start(#{ref => m2test, tls_port => TlsPort,
                                chain_pem => Chain, key_pem => Key,
                                clear_host => "127.0.0.1", clear_port => ClearPort}),
     timer:sleep(300),
@@ -22,7 +22,7 @@ main([CertF, KeyF, ClearPortS, TlsPortS]) ->
     Paths = ["/~meta@1.0/info", "/~meta@1.0/info/address", "/",
              "/~hyperbuddy@1.0/index", "/does-not-exist-xyz"],
     Results = [compare(P, ClearPort, TlsPort) || P <- Paths],
-    _ = acme_tls:stop(m2test),
+    _ = lib_acme_tls:stop(m2test),
 
     Fails = [R || R = {_, fail, _} <- Results],
     lists:foreach(fun({P, Verdict, Info}) ->

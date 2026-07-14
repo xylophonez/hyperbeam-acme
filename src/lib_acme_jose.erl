@@ -4,7 +4,7 @@
 %%% unchanged inside a HyperBEAM/LapEE node or a plain escript. All ACME
 %%% signing is ES256 (ECDSA P-256 + SHA-256), the algorithm every ACME CA
 %%% supports and the smallest to carry in an attested image.
--module(acme_jose).
+-module(lib_acme_jose).
 
 -include_lib("public_key/include/public_key.hrl").
 

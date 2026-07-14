@@ -1,5 +1,5 @@
 #!/usr/bin/env escript
-%%% Prove acme_store:tls_opts/2 yields a listener that terminates VALID,
+%%% Prove lib_acme_store:tls_opts/2 yields a listener that terminates VALID,
 %%% chain-complete TLS: a client verifies the server against the test CA with
 %%% hostname checking, for both the apex and a wildcard host. Also checks
 %%% not_after / needs_renewal. Args: chain.pem key.pem ca.pem
@@ -11,7 +11,7 @@ main([ChainF, KeyF, CaF]) ->
     {ok, CaPem} = file:read_file(CaF),
     [CaDer | _] = [D || {'Certificate', D, not_encrypted} <- public_key:pem_decode(CaPem)],
 
-    Opts = acme_store:tls_opts(Chain, Key),
+    Opts = lib_acme_store:tls_opts(Chain, Key),
     {ok, LSock} = ssl:listen(0, [{reuseaddr, true}, {ip, {127,0,0,1}} | Opts]),
     {ok, {_, Port}} = ssl:sockname(LSock),
 
@@ -20,12 +20,12 @@ main([ChainF, KeyF, CaF]) ->
     ok = verified_handshake(LSock, Port, CaDer, "node7.tunnel.permaweb.space", "wildcard"),
 
     %% Renewal arithmetic against a fixed clock (no wall-clock read).
-    NotAfter = acme_store:not_after(Chain),
+    NotAfter = lib_acme_store:not_after(Chain),
     io:format("ok    leaf notAfter = ~p~n", [NotAfter]),
     Soon = shift_days(NotAfter, -10),   % 10 days before expiry
     Far  = shift_days(NotAfter, -60),   % 60 days before expiry
-    true  = acme_store:needs_renewal(Chain, {Soon, 30}),
-    false = acme_store:needs_renewal(Chain, {Far, 30}),
+    true  = lib_acme_store:needs_renewal(Chain, {Soon, 30}),
+    false = lib_acme_store:needs_renewal(Chain, {Far, 30}),
     io:format("ok    needs_renewal: true at T-10d, false at T-60d (30d threshold)~n"),
 
     io:format("~nTLS TERMINATION VERIFIED (apex + wildcard, chain-complete)~n").

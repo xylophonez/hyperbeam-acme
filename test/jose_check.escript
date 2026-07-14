@@ -1,29 +1,29 @@
 #!/usr/bin/env escript
-%% Offline anchors for acme_jose: base64url KATs, ES256 sign/verify against
+%% Offline anchors for lib_acme_jose: base64url KATs, ES256 sign/verify against
 %% crypto, and thumbprint/keyAuthorization determinism + shape.
 %% Expects modules precompiled to ./ebin (erlc -o ebin src/*.erl).
 -include_lib("public_key/include/public_key.hrl").
 
 main(_) ->
     true = code:add_pathz("ebin"),
-    ok = eq(<<>>, acme_jose:b64u(<<>>), "b64u empty"),
-    ok = eq(<<"Zm9vYmFy">>, acme_jose:b64u(<<"foobar">>), "b64u foobar"),
-    ok = eq(<<"Zg">>, acme_jose:b64u(<<"f">>), "b64u pad-strip"),
+    ok = eq(<<>>, lib_acme_jose:b64u(<<>>), "b64u empty"),
+    ok = eq(<<"Zm9vYmFy">>, lib_acme_jose:b64u(<<"foobar">>), "b64u foobar"),
+    ok = eq(<<"Zg">>, lib_acme_jose:b64u(<<"f">>), "b64u pad-strip"),
     %% 0xFF -> base64 '/w==' -> urlsafe '_w': exercises the +// substitution.
-    ok = eq(<<"_w">>, acme_jose:b64u_int(255, 1), "b64u urlsafe /"),
-    ok = eq(<<"AA">>, acme_jose:b64u_int(0, 1), "b64u_int zero-pad"),
+    ok = eq(<<"_w">>, lib_acme_jose:b64u_int(255, 1), "b64u urlsafe /"),
+    ok = eq(<<"AA">>, lib_acme_jose:b64u_int(0, 1), "b64u_int zero-pad"),
 
-    Key = acme_jose:gen_account_key(),
+    Key = lib_acme_jose:gen_account_key(),
     #{d := Priv, x := X, y := Y} = Key,
     32 = byte_size(X), 32 = byte_size(Y),
 
     %% Reload from just the private scalar -> same public coordinates.
-    Key2 = acme_jose:account_key_from_priv(Priv),
+    Key2 = lib_acme_jose:account_key_from_priv(Priv),
     ok = eq(Key, Key2, "reload key from priv"),
 
     %% ES256 roundtrip: our raw r||s must verify under crypto (reconstruct DER).
     Msg = <<"eyJhbGciOiJFUzI1NiJ9.payload">>,
-    Raw = acme_jose:sign_es256(Msg, Key),
+    Raw = lib_acme_jose:sign_es256(Msg, Key),
     64 = byte_size(Raw),
     <<R:256, S:256>> = Raw,
     Der = public_key:der_encode('ECDSA-Sig-Value', #'ECDSA-Sig-Value'{r = R, s = S}),
@@ -32,18 +32,18 @@ main(_) ->
     ok = io:format("ok    ES256 sign -> crypto:verify~n"),
 
     %% Thumbprint + keyAuthorization: deterministic, 43-char b64u (32-byte hash).
-    T1 = acme_jose:thumbprint(Key),
-    T2 = acme_jose:thumbprint(Key2),
+    T1 = lib_acme_jose:thumbprint(Key),
+    T2 = lib_acme_jose:thumbprint(Key2),
     ok = eq(T1, T2, "thumbprint deterministic"),
     43 = byte_size(T1),
-    KA = acme_jose:key_authorization(<<"tok-en_123">>, Key),
+    KA = lib_acme_jose:key_authorization(<<"tok-en_123">>, Key),
     43 = byte_size(KA),
     ok = io:format("ok    thumbprint/keyAuthorization shape~n"),
 
     %% JWS flattened serialization shape: protected/payload/signature present,
     %% and re-decoding the signing input verifies.
-    Jws = acme_jose:jws(#{<<"nonce">> => <<"n1">>, <<"url">> => <<"https://x/y">>,
-                          <<"jwk">> => acme_jose:jwk(Key)},
+    Jws = lib_acme_jose:jws(#{<<"nonce">> => <<"n1">>, <<"url">> => <<"https://x/y">>,
+                          <<"jwk">> => lib_acme_jose:jwk(Key)},
                         #{<<"termsOfServiceAgreed">> => true}, Key),
     #{<<"protected">> := P, <<"payload">> := Pl, <<"signature">> := Sg} =
         json:decode(Jws),

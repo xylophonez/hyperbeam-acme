@@ -2,7 +2,7 @@
 %%%
 %%% Wires the pieces together: on node start, ensure a current wildcard cert
 %%% exists (load from the store, or issue via ACME DNS-01 if missing/expiring),
-%%% then bring up the in-node TLS terminator (acme_tls) that fronts the node's
+%%% then bring up the in-node TLS terminator (lib_acme_tls) that fronts the node's
 %%% cleartext listener. The result: a LapEE that is its own tunnel provider edge,
 %%% terminating public TLS with no companion box and no base change.
 %%%
@@ -21,6 +21,18 @@
 
 -export([start/3]).
 
+%% Shared library modules bundled into the acme@1.0 device archive by the forge
+%% packager (hb_packager scans these lib_* modules and rewrites inter-module
+%% calls under the device's hashed root).
+-device_libraries([lib_acme_jose,
+                   lib_acme_csr,
+                   lib_acme_client,
+                   lib_acme_dns_namecheap,
+                   lib_acme_store,
+                   lib_acme_tls,
+                   lib_acme_tls_proxy,
+                   lib_acme_renewer]).
+
 -define(RENEW_DAYS, 30).
 -define(TLS_REF, acme_tls_listener).
 
@@ -31,7 +43,7 @@ start(M1, _M2, Opts) ->
     ok = publish_a_records(Config),
     {Chain, Key} = ensure_cert(Config),
     ok = start_terminator(Config, Chain, Key),
-    {ok, _} = acme_renewer:start_link(#{
+    {ok, _} = lib_acme_renewer:start_link(#{
         chain_path => chain_path(Config),
         renew_days => maps:get(renew_days, Config, ?RENEW_DAYS),
         interval_ms => maps:get(renew_interval_ms, Config, 12 * 60 * 60 * 1000),
@@ -39,8 +51,8 @@ start(M1, _M2, Opts) ->
     {ok, M1}.
 
 start_terminator(Config, Chain, Key) ->
-    _ = acme_tls:stop(?TLS_REF),
-    {ok, _} = acme_tls:start(#{
+    _ = lib_acme_tls:stop(?TLS_REF),
+    {ok, _} = lib_acme_tls:start(#{
         ref => ?TLS_REF,
         tls_port => maps:get(tls_port, Config, 443),
         chain_pem => Chain,
@@ -105,7 +117,7 @@ ensure_cert(Config) ->
 
 fresh_enough(Chain, Config) ->
     RenewDays = maps:get(renew_days, Config, ?RENEW_DAYS),
-    not acme_store:needs_renewal(Chain, {calendar:universal_time(), RenewDays}).
+    not lib_acme_store:needs_renewal(Chain, {calendar:universal_time(), RenewDays}).
 
 load_cert(ChainPath, KeyPath) ->
     case {file:read_file(ChainPath), file:read_file(KeyPath)} of
@@ -116,9 +128,9 @@ load_cert(ChainPath, KeyPath) ->
 issue_and_store(Config, Dir, ChainPath, KeyPath) ->
     ok = filelib:ensure_dir(ChainPath),
     AccountKey = load_or_new_account(Dir),
-    Result = acme_client:issue(#{
+    Result = lib_acme_client:issue(#{
         directory_url => maps:get(directory_url, Config,
-                                  acme_client:letsencrypt_prod()),
+                                  lib_acme_client:letsencrypt_prod()),
         account_key => AccountKey,
         contact => maps:get(contact, Config, []),
         identifiers => maps:get(identifiers, Config),
@@ -138,9 +150,9 @@ load_or_new_account(Dir) ->
     Path = filename:join(Dir, "account.key"),
     case file:read_file(Path) of
         {ok, B64} ->
-            acme_jose:account_key_from_priv(base64:decode(B64));
+            lib_acme_jose:account_key_from_priv(base64:decode(B64));
         _ ->
-            Key = acme_jose:gen_account_key(),
+            Key = lib_acme_jose:gen_account_key(),
             #{d := Priv} = Key,
             ok = filelib:ensure_dir(Path),
             ok = write_private(Path, base64:encode(Priv)),
@@ -159,7 +171,7 @@ write_private(Path, Bytes) ->
 dns_provider(#{dns := Dns, domain := Domain}) ->
     case maps:get(provider, Dns, undefined) of
         <<"namecheap">> ->
-            {acme_dns_namecheap, acme_dns_namecheap:new(Dns#{domain => Domain})};
+            {lib_acme_dns_namecheap, lib_acme_dns_namecheap:new(Dns#{domain => Domain})};
         Other ->
             error({unsupported_dns_provider, Other})
     end.

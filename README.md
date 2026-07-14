@@ -81,19 +81,19 @@ path end-to-end, which folds into packaging the loadable device (M3).
 
 | Module | Responsibility | Runs |
 | --- | --- | --- |
-| `acme_jose` | ES256/JWS, JWK thumbprint, dns-01 keyAuthorization (RFC 7515/7518/7638) | anywhere |
-| `acme_csr` | PKCS#10 CSR with a SubjectAltName over the wildcard + apex, via a tiny DER encoder | anywhere |
-| `acme_client` | the RFC 8555 DNS-01 state machine, with a pluggable DNS callback | anywhere |
-| `acme_dns_namecheap` | Namecheap DNS provider — read-modify-write, never clobbers existing records | anywhere |
-| `acme_store` | stored PEM chain+key → TLS listener options; leaf expiry / renewal check | anywhere |
-| `acme_tls` | opens the in-node `cowboy:start_tls` terminator (M2) | in HyperBEAM |
-| `acme_tls_proxy` | cowboy handler: faithfully relay each request to the local clear port | in HyperBEAM |
-| `acme_renewer` | periodic gen_server: re-issue + hot-swap the cert near expiry | anywhere |
+| `lib_acme_jose` | ES256/JWS, JWK thumbprint, dns-01 keyAuthorization (RFC 7515/7518/7638) | anywhere |
+| `lib_acme_csr` | PKCS#10 CSR with a SubjectAltName over the wildcard + apex, via a tiny DER encoder | anywhere |
+| `lib_acme_client` | the RFC 8555 DNS-01 state machine, with a pluggable DNS callback | anywhere |
+| `lib_acme_dns_namecheap` | Namecheap DNS provider — read-modify-write, never clobbers existing records | anywhere |
+| `lib_acme_store` | stored PEM chain+key → TLS listener options; leaf expiry / renewal check | anywhere |
+| `lib_acme_tls` | opens the in-node `cowboy:start_tls` terminator (M2) | in HyperBEAM |
+| `lib_acme_tls_proxy` | cowboy handler: faithfully relay each request to the local clear port | in HyperBEAM |
+| `lib_acme_renewer` | periodic gen_server: re-issue + hot-swap the cert near expiry | anywhere |
 | `dev_acme` | the `acme@1.0` on/start hook: publish A records, ensure cert, terminate, renew | in HyperBEAM |
 
 ## DNS providers
 
-`acme_client` calls a provider through a small behaviour so the wildcard-capable
+`lib_acme_client` calls a provider through a small behaviour so the wildcard-capable
 DNS side is never hard-wired:
 
 ```erlang
@@ -101,7 +101,7 @@ DNS side is never hard-wired:
 -callback clear_txt(State, FqdnName, Value) -> {ok, State} | {error, term()}.
 ```
 
-`acme_dns_namecheap` is the reference provider. **Namecheap's `setHosts`
+`lib_acme_dns_namecheap` is the reference provider. **Namecheap's `setHosts`
 replaces the entire record set**, so every mutation is read-modify-write
 (`getHosts` → edit → `setHosts`) and can never wipe a node's own A/CNAME records.
 The caller's public IP must be Namecheap-whitelisted; in production this runs on

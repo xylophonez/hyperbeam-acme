@@ -4,17 +4,17 @@
 %%% inside the node. Produces an EC P-256 CSR whose SubjectAltName carries every
 %%% requested dNSName (the wildcard and its apex), which is what a DNS-01 order
 %%% finalizes against.
--module(acme_csr).
+-module(lib_acme_csr).
 
 -export([generate/1, generate/2, key_to_pem/1]).
 
 %% Returns the DER CSR (ACME wants base64url of this) and the freshly generated
-%% certificate key, kept as the same #{d,x,y} map shape acme_jose uses.
--spec generate([binary()]) -> {CsrDer :: binary(), acme_jose:key()}.
+%% certificate key, kept as the same #{d,x,y} map shape lib_acme_jose uses.
+-spec generate([binary()]) -> {CsrDer :: binary(), lib_acme_jose:key()}.
 generate(Dnsnames) ->
-    generate(Dnsnames, acme_jose:gen_account_key()).
+    generate(Dnsnames, lib_acme_jose:gen_account_key()).
 
--spec generate([binary()], acme_jose:key()) -> {binary(), acme_jose:key()}.
+-spec generate([binary()], lib_acme_jose:key()) -> {binary(), lib_acme_jose:key()}.
 generate([_ | _] = Dnsnames, #{d := Priv, x := X, y := Y} = Key) ->
     Point = <<4, X/binary, Y/binary>>,
     SpkiAlg = seq([oid([1,2,840,10045,2,1]),          % id-ecPublicKey
@@ -30,7 +30,7 @@ generate([_ | _] = Dnsnames, #{d := Priv, x := X, y := Y} = Key) ->
 
 %% SEC1 PEM for the cert key, so it can be stored next to the issued chain and
 %% loaded by a TLS terminator later.
--spec key_to_pem(acme_jose:key()) -> binary().
+-spec key_to_pem(lib_acme_jose:key()) -> binary().
 key_to_pem(#{d := Priv, x := X, y := Y}) ->
     EcKey = seq([integer(1),
                  der(16#04, Priv),                                   % privateKey OCTET STRING

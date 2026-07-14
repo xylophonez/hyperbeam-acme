@@ -5,7 +5,7 @@
 %%% the Host header is preserved so the provider still routes public traffic to
 %%% the right registered node, status/redirects/content-types/bodies of any size
 %%% pass through untouched. Hop-by-hop headers are stripped per RFC 7230 §6.1.
--module(acme_tls_proxy).
+-module(lib_acme_tls_proxy).
 
 -export([init/2]).
 

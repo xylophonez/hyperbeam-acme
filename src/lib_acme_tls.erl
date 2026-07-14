@@ -6,9 +6,9 @@
 %%% never leaves the appliance, and no base change to hb_http_server is needed.
 %%%
 %%% Runs inside HyperBEAM, so it uses the cowboy/gun already on the node. It is
-%%% NOT compiled or run by the offline test suite; acme_store carries the part
+%%% NOT compiled or run by the offline test suite; lib_acme_store carries the part
 %%% that is provable without a node.
--module(acme_tls).
+-module(lib_acme_tls).
 
 -export([start/1, stop/1]).
 
@@ -19,9 +19,9 @@ start(#{ref := Ref, tls_port := Port, chain_pem := Chain, key_pem := Key,
         clear_host := CHost, clear_port := CPort}) ->
     _ = application:ensure_all_started(cowboy),
     _ = application:ensure_all_started(gun),
-    TlsOpts = acme_store:tls_opts(Chain, Key),
+    TlsOpts = lib_acme_store:tls_opts(Chain, Key),
     Dispatch = cowboy_router:compile(
-        [{'_', [{'_', acme_tls_proxy, #{clear_host => CHost, clear_port => CPort}}]}]),
+        [{'_', [{'_', lib_acme_tls_proxy, #{clear_host => CHost, clear_port => CPort}}]}]),
     cowboy:start_tls(
         Ref,
         #{socket_opts => [{port, Port} | TlsOpts],

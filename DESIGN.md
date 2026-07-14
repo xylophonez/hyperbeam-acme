@@ -51,7 +51,7 @@ like any other AO-Core device. A future protocol-breaking revision would be
 
 ## The DNS-01 flow
 
-`acme_client:issue/1` implements RFC 8555 §7 end to end:
+`lib_acme_client:issue/1` implements RFC 8555 §7 end to end:
 
 1. **directory** — fetch the CA's endpoint map.
 2. **newNonce** — seed the anti-replay nonce; every subsequent POST consumes one
@@ -68,7 +68,7 @@ like any other AO-Core device. A future protocol-breaking revision would be
    authoritative nameservers (`dns_settle`, default configurable).
 7. **trigger + poll** — POST each challenge to tell the CA to validate, then poll
    each authorization to `valid` (or fail fast on `invalid`).
-8. **finalize** — generate the certificate key + CSR (`acme_csr`) and POST it;
+8. **finalize** — generate the certificate key + CSR (`lib_acme_csr`) and POST it;
    poll the order to `valid`.
 9. **download** — POST-as-GET the certificate URL for the PEM chain.
 10. **cleanup** — remove the challenge TXT records (best-effort; issuance has
@@ -78,7 +78,7 @@ like any other AO-Core device. A future protocol-breaking revision would be
 
 - **ES256 signature encoding.** `crypto:sign(ecdsa, ...)` yields a DER
   `ECDSA-Sig-Value`; JOSE requires the **raw `r ‖ s`** concatenation, each
-  coordinate fixed at 32 bytes on P-256. `acme_jose` converts and left-pads.
+  coordinate fixed at 32 bytes on P-256. `lib_acme_jose` converts and left-pads.
 - **JWK thumbprint (RFC 7638).** SHA-256 over canonical JSON of the required
   members **only** (`crv`,`kty`,`x`,`y`), keys in lexicographic order, no
   whitespace. Any deviation and the CA rejects the dns-01 challenge.
@@ -123,19 +123,19 @@ change is needed.
 
 Mechanics:
 
-- `acme_store:tls_opts/2` turns the stored leaf+chain+key into `ssl` listener
+- `lib_acme_store:tls_opts/2` turns the stored leaf+chain+key into `ssl` listener
   options (`cert`/`key`/`cacerts`). **Proven** by `test/tls_check.escript`: a
   client verifies the live terminator against the issuing CA, with hostname
   checking, for both the apex and a wildcard name — so the chain it serves is
   complete and trusted.
-- `acme_tls` starts the `cowboy:start_tls` listener with those options and a
-  route that sends everything to `acme_tls_proxy`.
-- `acme_tls_proxy` relays each request to `127.0.0.1:<clear-port>` over `gun`,
+- `lib_acme_tls` starts the `cowboy:start_tls` listener with those options and a
+  route that sends everything to `lib_acme_tls_proxy`.
+- `lib_acme_tls_proxy` relays each request to `127.0.0.1:<clear-port>` over `gun`,
   **preserving the Host header** (so a tunnel provider still routes public
   traffic to the right registered node) and passing status/redirects/content
   types/bodies of any size through untouched. Hop-by-hop headers are stripped.
 - `dev_acme` is the on/start hook: load the cert from the store, issue via
-  `acme_client` if it is missing or within `renew-days` of expiry, then start the
+  `lib_acme_client` if it is missing or within `renew-days` of expiry, then start the
   terminator. The ACME account key is persisted and reused across renewals.
 
 The one runtime cost versus the core edit is a second listener and an in-process
@@ -144,7 +144,7 @@ already uses.
 
 ## What is deliberately not here yet
 
-- **In-node M2 integration test.** `acme_tls`/`acme_tls_proxy`/`dev_acme` compile
+- **In-node M2 integration test.** `lib_acme_tls`/`lib_acme_tls_proxy`/`dev_acme` compile
   and target the cowboy/gun already on a HyperBEAM node; the end-to-end
   terminate-and-relay test (large bodies, redirects, Host routing) runs on a
   HyperBEAM harness, not the offline suite.

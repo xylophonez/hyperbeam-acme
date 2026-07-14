@@ -11,19 +11,19 @@ main(_) ->
     true = code:add_pathz("ebin"),
     Domain = <<"permaweb.space">>,
     Identifiers = [<<"*.tunnel.permaweb.space">>, <<"tunnel.permaweb.space">>],
-    Dns = acme_dns_namecheap:new(#{
+    Dns = lib_acme_dns_namecheap:new(#{
         api_user  => env(<<"NAMECHEAP_API_USER">>),
         api_key   => env(<<"NAMECHEAP_API_KEY">>),
         username  => env(<<"NAMECHEAP_USERNAME">>),
         client_ip => env(<<"NAMECHEAP_CLIENT_IP">>),
         domain    => Domain}),
     io:format("Requesting LE STAGING cert for ~p~n", [Identifiers]),
-    Result = acme_client:issue(#{
-        directory_url => acme_client:letsencrypt_staging(),
+    Result = lib_acme_client:issue(#{
+        directory_url => lib_acme_client:letsencrypt_staging(),
         contact       => [<<"mailto:xylophonezygote@gmail.com">>],
         identifiers   => Identifiers,
         dns_settle    => 60000,
-        dns           => {acme_dns_namecheap, Dns}}),
+        dns           => {lib_acme_dns_namecheap, Dns}}),
     case Result of
         {ok, #{certificate := Chain, certificate_key := KeyPem}} ->
             ok = file:write_file("staging-cert.pem", Chain),

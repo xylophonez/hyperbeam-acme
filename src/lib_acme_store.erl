@@ -5,7 +5,7 @@
 %%% a listener needs, and answer "does this cert need renewing yet?". Persistence
 %%% is the caller's job (the device uses hb_store; tests use files) so this stays
 %%% dependency-free.
--module(acme_store).
+-module(lib_acme_store).
 
 -include_lib("public_key/include/public_key.hrl").
 

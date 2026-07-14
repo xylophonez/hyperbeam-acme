@@ -1,12 +1,12 @@
-%%% Namecheap DNS-01 provider for acme_client.
+%%% Namecheap DNS-01 provider for lib_acme_client.
 %%%
 %%% CRITICAL: Namecheap's setHosts REPLACES the entire record set for a domain.
 %%% Every mutation here is read-modify-write (getHosts -> edit -> setHosts) so
 %%% the tunnel's own A/CNAME records are never clobbered. The caller's public IP
 %%% must be whitelisted in the Namecheap API console; in production this runs on
 %%% the provider LapEE, whose IP is already whitelisted.
--module(acme_dns_namecheap).
--behaviour(acme_client).
+-module(lib_acme_dns_namecheap).
+-behaviour(lib_acme_client).
 
 -export([new/1, set_txt/3, clear_txt/3, clear_name/2, ensure_a/3]).
 

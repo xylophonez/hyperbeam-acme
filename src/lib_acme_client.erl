@@ -4,7 +4,7 @@
 %%% module drives a plain escript proof and, later, the acme@1.0 device. The DNS
 %%% side is a callback so the wildcard-capable provider (Namecheap today) is
 %%% pluggable and never hard-wired here.
--module(acme_client).
+-module(lib_acme_client).
 
 -export([issue/1, letsencrypt_staging/0, letsencrypt_prod/0]).
 
@@ -31,7 +31,7 @@ letsencrypt_prod() ->
 issue(Config) ->
     _ = application:ensure_all_started(inets),
     _ = application:ensure_all_started(ssl),
-    AccountKey = maps:get(account_key, Config, acme_jose:gen_account_key()),
+    AccountKey = maps:get(account_key, Config, lib_acme_jose:gen_account_key()),
     try
         Dir = get_directory(maps:get(directory_url, Config)),
         Nonce0 = new_nonce(Dir),
@@ -70,7 +70,7 @@ new_nonce(#{<<"newNonce">> := Url}) ->
 new_account(#{<<"newAccount">> := Url}, Key, Config, Nonce) ->
     Payload = #{<<"termsOfServiceAgreed">> => true,
                 <<"contact">> => maps:get(contact, Config, [])},
-    Protected = #{<<"jwk">> => acme_jose:jwk(Key),
+    Protected = #{<<"jwk">> => lib_acme_jose:jwk(Key),
                   <<"nonce">> => Nonce, <<"url">> => Url},
     {Status, Headers, _Body, Nonce1} = jose_post(Url, Protected, Payload, Key),
     true = (Status =:= 200) orelse (Status =:= 201),
@@ -93,7 +93,7 @@ authorize_all(Key, Kid, #{<<"authorizations">> := AuthUrls}, Config, Nonce) ->
               Chal = dns01_challenge(Authz),
               #{<<"token">> := Token, <<"url">> := ChalUrl} = Chal,
               TxtName = <<"_acme-challenge.", (strip_wild(Domain))/binary>>,
-              TxtVal = acme_jose:key_authorization(Token, Key),
+              TxtVal = lib_acme_jose:key_authorization(Token, Key),
               {ok, DnsCtx1} = dns_call(Config, set_txt, DnsCtx, TxtName, TxtVal),
               ok = log("provisioned TXT ~s", [TxtName]),
               {DnsCtx1, [{ChalUrl, AuthUrl, TxtName, TxtVal} | Chals], N1}
@@ -121,9 +121,9 @@ trigger_and_poll(Key, Kid, Challenges, Nonce) ->
       end, N1, Challenges).
 
 finalize(Key, Kid, #{<<"finalize">> := FinalizeUrl}, OrderUrl, Ids, Nonce) ->
-    {CsrDer, CertKey} = acme_csr:generate(Ids),
-    put(cert_key_pem, acme_csr:key_to_pem(CertKey)),
-    Payload = #{<<"csr">> => acme_jose:b64u(CsrDer)},
+    {CsrDer, CertKey} = lib_acme_csr:generate(Ids),
+    put(cert_key_pem, lib_acme_csr:key_to_pem(CertKey)),
+    Payload = #{<<"csr">> => lib_acme_jose:b64u(CsrDer)},
     {S, _H, _B, N1} = jose_post_kid(FinalizeUrl, Kid, Payload, Key, Nonce),
     true = lists:member(S, [200, 202]),
     N2 = poll_status(OrderUrl, Kid, Key, N1, <<"valid">>, [<<"invalid">>], order),
@@ -184,12 +184,12 @@ provisioned() ->
 %%% ---- HTTP + JOSE POST helpers -------------------------------------------
 
 jose_post(Url, Protected, Payload, Key) ->
-    Body = acme_jose:jws(Protected, Payload, Key),
+    Body = lib_acme_jose:jws(Protected, Payload, Key),
     http_post(Url, Body).
 
 jose_post_kid(Url, Kid, Payload, Key, Nonce) ->
     Protected = #{<<"kid">> => Kid, <<"nonce">> => Nonce, <<"url">> => Url},
-    Body = acme_jose:jws(Protected, Payload, Key),
+    Body = lib_acme_jose:jws(Protected, Payload, Key),
     http_post(Url, Body).
 
 http_get(Url) -> request(get, {b2l(Url), []}).

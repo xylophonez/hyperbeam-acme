@@ -5,7 +5,7 @@
 %%% re-issues, stores, and hot-swaps the terminator's cert). The clock and the
 %%% renew action are parameters, so the decision logic is testable without a CA,
 %%% a node, or wall-clock waits.
--module(acme_renewer).
+-module(lib_acme_renewer).
 -behaviour(gen_server).
 
 -export([start_link/1, check_now/1, stop/1]).
@@ -62,7 +62,7 @@ do_check(#{chain_path := Path, renew_days := Days,
            renew_fun := RenewFun, clock_fun := Clock}) ->
     case file:read_file(Path) of
         {ok, Chain} ->
-            case acme_store:needs_renewal(Chain, {Clock(), Days}) of
+            case lib_acme_store:needs_renewal(Chain, {Clock(), Days}) of
                 true -> {renewed, RenewFun()};
                 false -> not_due
             end;
