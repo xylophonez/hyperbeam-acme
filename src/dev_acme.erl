@@ -39,16 +39,28 @@
 %% AO-Core device hook: (Msg1, Msg2, Opts) -> {ok, Msg1}. Side effects are the
 %% running terminator and renewer; the message passes through unchanged.
 start(M1, _M2, Opts) ->
-    Config = config(M1, Opts),
-    ok = publish_a_records(Config),
-    {Chain, Key} = ensure_cert(Config),
-    ok = start_terminator(Config, Chain, Key),
-    {ok, _} = lib_acme_renewer:start_link(#{
-        chain_path => chain_path(Config),
-        renew_days => maps:get(renew_days, Config, ?RENEW_DAYS),
-        interval_ms => maps:get(renew_interval_ms, Config, 12 * 60 * 60 * 1000),
-        renew_fun => fun() -> renew(Config) end}),
+    %% Never crash the node boot: run the whole bring-up in a spawned process
+    %% and log any failure, so a provider issue degrades to "no TLS" rather than
+    %% a boot loop. The hook returns immediately.
+    _ = spawn(fun() -> bringup(config(M1, Opts)) end),
     {ok, M1}.
+
+bringup(Config) ->
+    try
+        ok = publish_a_records(Config),
+        {Chain, Key} = ensure_cert(Config),
+        ok = start_terminator(Config, Chain, Key),
+        {ok, _} = lib_acme_renewer:start_link(#{
+            chain_path => chain_path(Config),
+            renew_days => maps:get(renew_days, Config, ?RENEW_DAYS),
+            interval_ms => maps:get(renew_interval_ms, Config, 12 * 60 * 60 * 1000),
+            renew_fun => fun() -> renew(Config) end}),
+        io:format("ACME_PROVIDER_UP tls-port=~p~n", [maps:get(tls_port, Config, 443)])
+    catch
+        Class:Reason:Stack ->
+            io:format("ACME_PROVIDER_FAIL ~p:~p~n  config-keys=~p~n  ~p~n",
+                      [Class, Reason, maps:keys(Config), Stack])
+    end.
 
 start_terminator(Config, Chain, Key) ->
     _ = lib_acme_tls:stop(?TLS_REF),
@@ -180,9 +192,11 @@ dns_provider(#{dns := Dns, domain := Domain}) ->
 
 %% Pull the device config from the message, falling back to node opts. Accepts
 %% either atom or binary keys (the generic LapEE/AndEE config pattern).
-config(M1, Opts) when is_map(M1) ->
-    Raw = maps:merge(sub(Opts, <<"acme">>), sub(M1, <<"acme">>)),
-    normalize(Raw).
+%% The acme block lives at the node-config top level (Opts). M1 (the hook Base)
+%% may not be a map, so never guard on it.
+config(M1, Opts) ->
+    FromMsg = case is_map(M1) of true -> sub(M1, <<"acme">>); false -> #{} end,
+    normalize(maps:merge(sub(Opts, <<"acme">>), FromMsg)).
 
 sub(Map, Key) when is_map(Map) ->
     case maps:get(Key, Map, maps:get(binary_to_atom(Key, utf8), Map, #{})) of
