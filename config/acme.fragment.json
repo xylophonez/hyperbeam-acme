@@ -1,0 +1,30 @@
+{
+  "_note": "MERGE these keys into your LapEE/node config (e.g. the tunnel provider's broker config); do not use standalone. The acme@1.0 pin is the published Arweave impl dataitem ID (spec: WmlAr6MSo6Iq6gViQ9A5qXnC-RTRSBHx4fOzE7cpGdI). Set your own domain, identifiers, clear-port, cert-dir, and DNS credentials. NEVER commit the real api-key.",
+  "on": {
+    "start": [
+      {
+        "device": "acme@1.0",
+        "path": "start"
+      }
+    ]
+  },
+  "trusted-devices": {
+    "acme@1.0": "YQ3cHTTYWYqbXs92c92_YxPy48eFx1v9UqX7ileVHVI"
+  },
+  "acme": {
+    "domain": "example.com",
+    "identifiers": ["*.tunnel.example.com", "tunnel.example.com"],
+    "tls-port": 443,
+    "clear-port": 8080,
+    "cert-dir": "/var/lib/hyperbeam/acme",
+    "renew-days": 30,
+    "directory-url": "https://acme-v02.api.letsencrypt.org/directory",
+    "dns": {
+      "provider": "namecheap",
+      "api-user": "YOUR_NAMECHEAP_USER",
+      "api-key": "SET_AT_DEPLOY_TIME_DO_NOT_COMMIT",
+      "username": "YOUR_NAMECHEAP_USER",
+      "client-ip": "YOUR_NODE_PUBLIC_IP"
+    }
+  }
+}

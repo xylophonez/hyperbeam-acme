@@ -53,13 +53,15 @@ of the zone left untouched. The offline crypto is independently anchored:
 `test/jose_check.escript` verifies our ES256 signatures under `crypto`, and the
 hand-rolled CSR passes `openssl`'s own PKCS#10 self-signature + SAN checks.
 
+**Published:** the `acme@1.0` device archive is on Arweave — pin `YQ3cHTTYWYqbXs92c92_YxPy48eFx1v9UqX7ileVHVI` (spec `WmlAr6MSo6Iq6gViQ9A5qXnC-RTRSBHx4fOzE7cpGdI`). Merge [`config/acme.fragment.json`](config/acme.fragment.json) into a node's config to load it.
+
 ### Roadmap
 
 | Milestone | Scope | Base change |
 | --- | --- | --- |
 | **M1 — issuance** ✅ | DNS-01 order → wildcard cert in the store | none (pure device) |
 | **M2 — termination** ✅ | in-node TLS terminator proxying the local clear port; retire Caddy | **none** (device-only) |
-| **M3 — renewal + device** 🚧 | ~60-day renewal loop; A-record publish; packaged `acme@1.0` device | none |
+| **M3 — renewal + device** ✅ | renewal loop; A-record publish; **published** `acme@1.0` device | none |
 
 **M2 keeps base pristine too.** The clean alternative — a generic `start_tls`
 hook in `hb_http_server` — would be one small, upstreamable core edit, but it was
