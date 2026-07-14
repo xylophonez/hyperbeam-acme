@@ -19,7 +19,7 @@
 %%%                   username, client_ip}
 -module(dev_acme).
 
--export([info/1, start/3]).
+-export([info/1, run/3]).
 
 %% Shared library modules bundled into the acme@1.0 device archive by the forge
 %% packager (hb_packager scans these lib_* modules and rewrites inter-module
@@ -39,11 +39,12 @@
 %% Declare the device's callable keys so HyperBEAM can dispatch the on/start
 %% hook to start/3 (without this, dispatch raises function_clause).
 info(_) ->
-    #{ exports => [<<"info">>, <<"start">>] }.
+    #{ exports => [<<"run">>] }.
 
 %% AO-Core device hook: (Msg1, Msg2, Opts) -> {ok, Msg1}. Side effects are the
 %% running terminator and renewer; the message passes through unchanged.
-start(M1, _M2, Opts) ->
+run(M1, _M2, Opts) ->
+    io:format("ACME_RUN_ENTERED~n"),
     %% Never crash the node boot: run the whole bring-up in a spawned process
     %% and log any failure, so a provider issue degrades to "no TLS" rather than
     %% a boot loop. The hook returns immediately.
