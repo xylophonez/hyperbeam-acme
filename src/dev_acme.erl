@@ -44,7 +44,6 @@ info(_) ->
 %% AO-Core device hook: (Msg1, Msg2, Opts) -> {ok, Msg1}. Side effects are the
 %% running terminator and renewer; the message passes through unchanged.
 run(M1, _M2, Opts) ->
-    io:format("ACME_RUN_ENTERED~n"),
     %% Never crash the node boot: run the whole bring-up in a spawned process
     %% and log any failure, so a provider issue degrades to "no TLS" rather than
     %% a boot loop. The hook returns immediately.

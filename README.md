@@ -53,7 +53,15 @@ of the zone left untouched. The offline crypto is independently anchored:
 `test/jose_check.escript` verifies our ES256 signatures under `crypto`, and the
 hand-rolled CSR passes `openssl`'s own PKCS#10 self-signature + SAN checks.
 
-**Published:** the `acme@1.0` device archive is on Arweave — pin `YQ3cHTTYWYqbXs92c92_YxPy48eFx1v9UqX7ileVHVI` (spec `WmlAr6MSo6Iq6gViQ9A5qXnC-RTRSBHx4fOzE7cpGdI`). Merge [`config/acme.fragment.json`](config/acme.fragment.json) into a node's config to load it.
+**Published & running in production.** The `acme@1.0` device archive is on
+Arweave — pin `72XYKqaXO5JVj6_LMpkNVjWrv1wGQH3ZW9_2eNyQVsk`. Merge
+[`config/acme.fragment.json`](config/acme.fragment.json) into a node's config to
+load it. It is deployed on a live tunnel-provider node: the node terminates its
+own wildcard TLS on 443 (no Caddy) and auto-renews before expiry. The same device
+also loads and runs on the **Android HyperBEAM runtime** (proven on a Pixel 6
+Pro), so any node — cloud or on-device — with a **public IP** can be its own
+attested TLS edge. (A node behind **CGNAT** — Starlink, most mobile — cannot be a
+public provider; it *joins* one over the reverse tunnel instead.)
 
 ### Roadmap
 
@@ -70,14 +78,39 @@ listener and reverse-proxies to the node's cleartext port, so the whole thing
 still ships as a published device ID + config with **zero** changes to the base
 repo. See [DESIGN.md](DESIGN.md#m2-termination-device-only).
 
-**M2 status:** proven two ways. Offline, `test/tls_check.escript` verifies the
-terminator against its CA with hostname checking (apex + wildcard,
-chain-complete). In-node, `test/m2_proxy_check.escript` stands the terminator up
-in front of a **real running HyperBEAM listener** and confirms every response
-relays **byte-for-byte through TLS** — a 200 JSON body, a **307 with its
-`Location` preserved**, a hyperbuddy page, and a 404 passthrough all matched the
-cleartext origin exactly. What remains is wiring `dev_acme`'s issue→store→terminate
-path end-to-end, which folds into packaging the loadable device (M3).
+**Termination is proven three ways.** Offline, `test/tls_check.escript` verifies
+the terminator against its CA with hostname checking (apex + wildcard,
+chain-complete). In-node, `test/m2_proxy_check.escript` stands it up in front of a
+**real running HyperBEAM listener** and confirms every response relays
+**byte-for-byte through TLS** — a 200 JSON body, a **307 with `Location`
+preserved**, a hyperbuddy page, and a 404 passthrough all matched the cleartext
+origin. In production, a live provider node serves `tunnel.permaweb.space` over
+its own 443 with a real Let's Encrypt cert and no reverse proxy.
+
+## Deploying the device
+
+The device is loaded by pin and driven entirely by config — but three details of
+the on/start hook are **load-bearing** (get them wrong and the node crashes with
+`function_clause` during boot):
+
+```json
+"on": { "start": [ { "device": "acme@1.0", "path": "run", "hook": { "result": "ignore" } } ] }
+```
+
+- **`"path": "run"` — not `"start"`.** `start` collides with HyperBEAM's own
+  dispatch; the hook entry point is named `run` (like `tunnel@1.0` uses `connect`
+  and `measurement@1.0` uses `boot`, never `start`).
+- **`"hook": { "result": "ignore" }`** — the on/start chain threads the request
+  through each handler; without `result: ignore`, this side-effect hook's return
+  breaks the next handler.
+- The device itself exports **`info/1`** declaring `#{exports => [<<"run">>]}`;
+  without it the key can't be dispatched. (This is in the device, not your config
+  — noted here because it's the other half of the same gotcha.)
+
+See [`config/acme.fragment.json`](config/acme.fragment.json) for the full block
+(domain, identifiers, `tls-port`, `clear-port`, `cert-dir`, `renew-days`, and the
+DNS credentials). **Requires a node with a public IP / reachable inbound port** —
+it will not work behind CGNAT.
 
 ## Architecture
 
