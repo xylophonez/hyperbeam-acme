@@ -21,11 +21,6 @@
 
 -export([info/1, start/3]).
 
-%% Declare the device's callable keys so HyperBEAM can dispatch the on/start
-%% hook to start/3 (without this, dispatch raises function_clause).
-info(_) ->
-    #{ exports => [<<"info">>, <<"start">>] }.
-
 %% Shared library modules bundled into the acme@1.0 device archive by the forge
 %% packager (hb_packager scans these lib_* modules and rewrites inter-module
 %% calls under the device's hashed root).
@@ -40,6 +35,11 @@ info(_) ->
 
 -define(RENEW_DAYS, 30).
 -define(TLS_REF, acme_tls_listener).
+
+%% Declare the device's callable keys so HyperBEAM can dispatch the on/start
+%% hook to start/3 (without this, dispatch raises function_clause).
+info(_) ->
+    #{ exports => [<<"info">>, <<"start">>] }.
 
 %% AO-Core device hook: (Msg1, Msg2, Opts) -> {ok, Msg1}. Side effects are the
 %% running terminator and renewer; the message passes through unchanged.
