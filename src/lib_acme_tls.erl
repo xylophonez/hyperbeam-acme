@@ -17,6 +17,7 @@
 -spec start(map()) -> {ok, pid()} | {error, term()}.
 start(#{ref := Ref, tls_port := Port, chain_pem := Chain, key_pem := Key,
         clear_host := CHost, clear_port := CPort}) ->
+    _ = application:ensure_all_started(ssl),
     _ = application:ensure_all_started(cowboy),
     _ = application:ensure_all_started(gun),
     TlsOpts = lib_acme_store:tls_opts(Chain, Key),
